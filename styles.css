@@ -140,6 +140,39 @@ body {
     transform: scale(0.95);
 }
 
+/* Test notification row */
+.test-notification-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #e8f5e9;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid var(--primary-color);
+}
+
+.test-notification-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.test-notification-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.test-notification-btn:active {
+    transform: scale(0.95);
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
