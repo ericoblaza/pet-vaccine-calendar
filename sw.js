@@ -46,62 +46,98 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim(); // Take control immediately
 });
 
-// Background notification check
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SCHEDULE_REMINDERS') {
-    // Store reminders for background checking
-    event.waitUntil(storeReminders(event.data.appointments));
-  }
-  
-  if (event.data && event.data.type === 'CHECK_REMINDERS') {
-    event.waitUntil(checkBackgroundReminders());
+// Periodic Background Sync - runs when app is CLOSED (Chrome/PWA)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'vaccine-reminders') {
+    event.waitUntil(checkRemindersInBackground());
   }
 });
 
-// Store reminders in IndexedDB
-async function storeReminders(appointments) {
-  // Reminders are stored by main app in IndexedDB
-  // Service worker will check them periodically
-}
-
-// Check reminders from storage
-async function checkBackgroundReminders() {
+// Check reminders from IndexedDB (when app is closed)
+async function checkRemindersInBackground() {
   try {
-    // Request appointments from main app
-    const clients = await self.clients.matchAll();
-    if (clients.length > 0) {
-      clients[0].postMessage({ type: 'GET_APPOINTMENTS_FOR_BACKGROUND' });
+    const db = await openDB();
+    if (!db) return;
+    
+    const reminders = await getAllReminders(db);
+    const now = Date.now();
+    
+    for (const reminder of reminders) {
+      if (reminder.reminderTime <= now) {
+        const apt = reminder.appointment;
+        const isAt = reminder.type === 'at';
+        const title = isAt ? '🔔 Appointment Time!' : '🔔 Vaccine Reminder';
+        const date = new Date(apt.date);
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const body = isAt
+          ? `${apt.petName} (${apt.petType})\n${apt.vaccineType} is NOW at ${timeStr}\n📍 ${apt.location}`
+          : `${apt.petName} (${apt.petType})\n${apt.vaccineType} at ${timeStr}\n📍 ${apt.location}`;
+        
+        await self.registration.showNotification(title, {
+          body: body,
+          icon: './icon-192.png',
+          badge: './icon-192.png',
+          tag: `reminder-${apt.id}-${reminder.type}`,
+          requireInteraction: true,
+          silent: false,
+          vibrate: [200, 100, 200],
+          data: { appointmentId: apt.id, url: './' }
+        });
+        
+        await deleteReminder(db, reminder.id);
+      }
     }
-  } catch (error) {
-    console.error('Error checking reminders:', error);
+    
+    if (db) db.close();
+  } catch (err) {
+    console.error('Background reminder check failed:', err);
   }
 }
 
-// Show notification from service worker
-function showBackgroundNotification(appointment) {
-  const date = new Date(appointment.date);
-  const timeStr = date.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+function openDB() {
+  return new Promise((resolve) => {
+    const req = indexedDB.open('VaccineCalendarDB', 1);
+    req.onerror = () => resolve(null);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('reminders')) {
+        db.createObjectStore('reminders', { keyPath: 'id' });
+      }
+    };
   });
-  
-  const title = '🔔 Vaccine Reminder';
-  const options = {
-    body: `${appointment.petName} (${appointment.petType})\n${appointment.vaccineType} at ${timeStr}\n📍 ${appointment.location}`,
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: `reminder-${appointment.id}`,
-    requireInteraction: true,
-    silent: false,
-    vibrate: [200, 100, 200],
-    data: {
-      appointmentId: appointment.id,
-      url: './'
-    }
-  };
-  
-  return self.registration.showNotification(title, options);
 }
+
+function getAllReminders(db) {
+  return new Promise((resolve) => {
+    if (!db.objectStoreNames.contains('reminders')) {
+      resolve([]);
+      return;
+    }
+    const tx = db.transaction(['reminders'], 'readonly');
+    const store = tx.objectStore('reminders');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+function deleteReminder(db, id) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(['reminders'], 'readwrite');
+    const store = tx.objectStore('reminders');
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+// Message from main page
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CHECK_REMINDERS_NOW') {
+    event.waitUntil(checkRemindersInBackground());
+  }
+});
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
