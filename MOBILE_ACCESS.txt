@@ -1,0 +1,78 @@
+═══════════════════════════════════════════════════════
+  HOW TO ACCESS APP FROM ANDROID PHONE
+═══════════════════════════════════════════════════════
+
+YOUR COMPUTER IP ADDRESS: 192.168.1.46
+
+═══════════════════════════════════════════════════════
+METHOD 1: SIMPLE PYTHON SERVER (EASIEST)
+═══════════════════════════════════════════════════════
+
+STEP 1: Start the server on your laptop
+   - Double-click: start-server.bat
+   - Wait for message "Serving HTTP on 0.0.0.0 port 8000"
+
+STEP 2: On your Android phone
+   - Make sure phone is on SAME WiFi network as laptop
+   - Open Chrome browser
+   - Type in address bar:
+   
+     http://192.168.1.46:8000
+   
+   - Press Enter
+   - App should open!
+
+STEP 3: Install on phone (optional)
+   - Tap menu (3 dots) → "Add to Home screen"
+   - App will appear like a regular app!
+
+
+═══════════════════════════════════════════════════════
+METHOD 2: XAMPP (If you fix the port issue)
+═══════════════════════════════════════════════════════
+
+If you change XAMPP to port 8080:
+   http://192.168.1.46:8080/vaccine_calendar/
+
+
+═══════════════════════════════════════════════════════
+METHOD 3: TRANSFER FILES TO PHONE (Works Offline!)
+═══════════════════════════════════════════════════════
+
+1. Copy entire "vaccine_calendar" folder to your phone
+   - Use USB cable
+   - Or use Google Drive/Dropbox
+   - Or email the files to yourself
+
+2. On phone, open the folder
+3. Open "index.html" with Chrome browser
+4. Works completely offline!
+
+
+═══════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════
+
+❌ Can't connect?
+   ✓ Make sure laptop and phone are on SAME WiFi
+   ✓ Make sure server is running (start-server.bat)
+   ✓ Try turning off Windows Firewall temporarily
+   ✓ Check if IP address changed (run ipconfig again)
+
+❌ Python not found?
+   - Use Method 3 (transfer files) instead
+   - Or install Python from python.org
+
+❌ Still not working?
+   - Use Method 3 - transfer files to phone
+   - Works offline, no server needed!
+
+
+═══════════════════════════════════════════════════════
+QUICK LINK (when server is running):
+═══════════════════════════════════════════════════════
+
+http://192.168.1.46:8000
+
+═══════════════════════════════════════════════════════
+

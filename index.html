@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Pet Vaccine Calendar - Manage vaccination schedules for pets">
+    <meta name="theme-color" content="#4CAF50">
+    <title>Pet Vaccine Calendar</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="./icon-192.png">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🐾 Pet Vaccine Calendar</h1>
+            <button class="btn-add" id="addBtn" aria-label="Add new appointment">+ Add</button>
+        </header>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="filter-group">
+                <label for="filterType">Filter by:</label>
+                <select id="filterType" class="filter-select">
+                    <option value="all">All Appointments</option>
+                    <option value="pet">Pet Type</option>
+                    <option value="vaccine">Vaccine Type</option>
+                </select>
+            </div>
+            <div class="filter-group" id="filterValueGroup" style="display: none;">
+                <label for="filterValue">Select:</label>
+                <select id="filterValue" class="filter-select">
+                    <option value="">Choose...</option>
+                </select>
+            </div>
+            <button class="btn-clear" id="clearFilter" style="display: none;">Clear Filter</button>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search by pet name, owner, or location...">
+        </div>
+
+        <!-- Calendar View Toggle -->
+        <div class="view-toggle">
+            <button class="view-btn active" id="calendarViewBtn">📅 Calendar</button>
+            <button class="view-btn" id="listViewBtn">📋 List</button>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="view-container">
+            <div class="calendar-header">
+                <button class="nav-btn" id="prevMonth">←</button>
+                <h2 id="currentMonth"></h2>
+                <button class="nav-btn" id="nextMonth">→</button>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+
+        <!-- List View -->
+        <div id="listView" class="view-container" style="display: none;">
+            <div class="list-header">
+                <span>Upcoming Appointments</span>
+                <button class="btn-sort" id="sortBtn">Sort: Date ↑</button>
+            </div>
+            <div id="appointmentsList" class="appointments-list"></div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-number" id="todayCount">0</div>
+                <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="weekCount">0</div>
+                <div class="stat-label">This Week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="monthCount">0</div>
+                <div class="stat-label">This Month</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="appointmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Appointment</h2>
+                <button class="btn-close" id="closeModal">&times;</button>
+            </div>
+            <form id="appointmentForm">
+                <div class="form-group">
+                    <label for="petName">Pet Name *</label>
+                    <input type="text" id="petName" required placeholder="e.g., Max, Bella">
+                </div>
+                <div class="form-group">
+                    <label for="petType">Pet Type *</label>
+                    <select id="petType" required>
+                        <option value="">Select...</option>
+                        <option value="Dog">🐕 Dog</option>
+                        <option value="Cat">🐈 Cat</option>
+                        <option value="Rabbit">🐰 Rabbit</option>
+                        <option value="Bird">🐦 Bird</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vaccineType">Vaccine Type *</label>
+                    <select id="vaccineType" required>
+                        <option value="">Select...</option>
+                        <option value="Rabies">Rabies</option>
+                        <option value="DHPP">DHPP (Distemper, Hepatitis, Parvovirus, Parainfluenza)</option>
+                        <option value="FVRCP">FVRCP (Feline Viral Rhinotracheitis, Calicivirus, Panleukopenia)</option>
+                        <option value="Bordetella">Bordetella</option>
+                        <option value="Leptospirosis">Leptospirosis</option>
+                        <option value="Lyme">Lyme Disease</option>
+                        <option value="Canine Influenza">Canine Influenza</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentDate">Date *</label>
+                    <input type="date" id="appointmentDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentTime">Time *</label>
+                    <input type="time" id="appointmentTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="ownerName">Owner Name</label>
+                    <input type="text" id="ownerName" placeholder="Owner's name">
+                </div>
+                <div class="form-group">
+                    <label for="ownerPhone">Owner Phone</label>
+                    <input type="tel" id="ownerPhone" placeholder="Phone number">
+                </div>
+                <div class="form-group">
+                    <label for="location">Location *</label>
+                    <input type="text" id="location" required placeholder="Address or location">
+                    <button type="button" class="btn-location" id="getLocationBtn">📍 Use Current Location</button>
+                </div>
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" rows="3" placeholder="Additional notes..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="reminderTime">Reminder</label>
+                    <select id="reminderTime">
+                        <option value="none">No Reminder</option>
+                        <option value="15">15 minutes before</option>
+                        <option value="30">30 minutes before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="1440">1 day before</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+                <input type="hidden" id="appointmentId">
+            </form>
+        </div>
+    </div>
+
+    <!-- Appointment Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Appointment Details</h2>
+                <button class="btn-close" id="closeDetailModal">&times;</button>
+            </div>
+            <div id="appointmentDetails" class="appointment-details"></div>
+            <div class="detail-actions">
+                <!-- Buttons will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

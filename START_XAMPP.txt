@@ -1,0 +1,12 @@
+HOW TO START XAMPP:
+
+1. Open XAMPP Control Panel
+2. Click "Start" next to "Apache"
+3. Wait until Apache status shows "Running" (green)
+4. Then access: http://localhost/vaccine_calendar/
+
+If Apache won't start:
+- Check if port 80 is already in use
+- Try changing Apache port in XAMPP settings
+- Make sure you have administrator rights
+

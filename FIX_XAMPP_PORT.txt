@@ -1,0 +1,19 @@
+HOW TO CHANGE XAMPP PORT TO 8080:
+
+1. Open XAMPP Control Panel
+2. Click "Config" button next to Apache
+3. Select "httpd.conf"
+4. Find these lines (around line 60 and 180):
+   - Listen 80
+   - ServerName localhost:80
+5. Change them to:
+   - Listen 8080
+   - ServerName localhost:8080
+6. Save the file
+7. In XAMPP Control Panel, click "Config" → "Service and Port Settings"
+8. Change Apache Main Port to 8080
+9. Click "Save"
+10. Start Apache
+
+Then access your app at: http://localhost:8080/vaccine_calendar/
+

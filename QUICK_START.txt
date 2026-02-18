@@ -1,0 +1,45 @@
+═══════════════════════════════════════════════════════
+  PET VACCINE CALENDAR - QUICK START GUIDE
+═══════════════════════════════════════════════════════
+
+OPTION 1: USE DIRECTLY (EASIEST - NO SERVER NEEDED)
+─────────────────────────────────────────────────────
+1. Double-click: OPEN_APP.bat
+2. App opens in your browser
+3. Everything works! (Calendar, appointments, reminders, etc.)
+
+This works perfectly for local use on your computer!
+
+
+OPTION 2: FOR ANDROID PHONE ACCESS
+─────────────────────────────────────────────────────
+
+Method A: Simple Python Server
+1. Double-click: start-server.bat
+2. Find your computer's IP address:
+   - Open Command Prompt
+   - Type: ipconfig
+   - Look for "IPv4 Address" (e.g., 192.168.1.100)
+3. On Android phone (same WiFi):
+   - Open Chrome
+   - Go to: http://YOUR_IP:8000
+   - Example: http://192.168.1.100:8000
+
+Method B: Fix XAMPP Port
+1. Follow instructions in: FIX_XAMPP_PORT.txt
+2. Change Apache port to 8080
+3. Access at: http://localhost:8080/vaccine_calendar/
+
+
+OPTION 3: TRANSFER TO PHONE
+─────────────────────────────────────────────────────
+1. Copy entire vaccine_calendar folder to your phone
+2. Open index.html in Chrome on your phone
+3. Works offline!
+
+
+═══════════════════════════════════════════════════════
+RECOMMENDED: Just use OPEN_APP.bat for now!
+All features work without XAMPP.
+═══════════════════════════════════════════════════════
+

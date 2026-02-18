@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <h1>Icon Generator for Pet Vaccine Calendar</h1>
+    <p>This page will help you create icons for the app.</p>
+    <canvas id="icon192" width="192" height="192"></canvas>
+    <canvas id="icon512" width="512" height="512"></canvas>
+    <br>
+    <button onclick="downloadIcons()">Download Icons</button>
+    
+    <script>
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw a simple pet/vaccine icon
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.3;
+            
+            // Draw a syringe/vaccine symbol
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = size * 0.05;
+            
+            // Syringe body
+            ctx.beginPath();
+            ctx.rect(centerX - radius * 0.3, centerY - radius * 0.8, radius * 0.6, radius * 1.6);
+            ctx.stroke();
+            
+            // Syringe plunger
+            ctx.beginPath();
+            ctx.rect(centerX - radius * 0.2, centerY - radius * 0.9, radius * 0.4, radius * 0.3);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            
+            // Needle
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY + radius * 0.8);
+            ctx.lineTo(centerX, centerY + radius * 1.2);
+            ctx.stroke();
+            
+            // Pet paw print (small)
+            const pawSize = size * 0.15;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(centerX - radius * 0.6, centerY + radius * 0.3, pawSize * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX - radius * 0.3, centerY + radius * 0.2, pawSize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY + radius * 0.2, pawSize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + radius * 0.3, centerY + radius * 0.2, pawSize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + radius * 0.6, centerY + radius * 0.3, pawSize * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function downloadIcons() {
+            // Draw icons
+            const canvas192 = document.getElementById('icon192');
+            const canvas512 = document.getElementById('icon512');
+            
+            drawIcon(canvas192, 192);
+            drawIcon(canvas512, 512);
+            
+            // Download 192x192
+            canvas192.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'icon-192.png';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+            
+            // Download 512x512
+            setTimeout(() => {
+                canvas512.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'icon-512.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            }, 500);
+        }
+        
+        // Draw preview
+        window.onload = function() {
+            drawIcon(document.getElementById('icon192'), 192);
+            drawIcon(document.getElementById('icon512'), 512);
+        };
+    </script>
+</body>
+</html>
+
