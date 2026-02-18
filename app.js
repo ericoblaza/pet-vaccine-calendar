@@ -77,6 +77,7 @@ function registerServiceWorker() {
 function setupEventListeners() {
     addBtn.addEventListener('click', () => openModal());
     closeModal.addEventListener('click', closeModalFunc);
+    setupTestNotificationButton();
     closeDetailModal.addEventListener('click', closeDetailModalFunc);
     appointmentForm.addEventListener('submit', saveAppointment);
     calendarViewBtn.addEventListener('click', () => switchView('calendar'));
@@ -699,7 +700,69 @@ function setupNotificationBanner() {
     btn.addEventListener('click', function() {
         requestNotificationPermission();
         updateBannerVisibility();
+        showTestNotificationRowIfGranted();
     });
+
+    showTestNotificationRowIfGranted();
+}
+
+function showTestNotificationRowIfGranted() {
+    const row = document.getElementById('testNotificationRow');
+    if (!row) return;
+    if ('Notification' in window && Notification.permission === 'granted') {
+        row.style.display = 'flex';
+    } else {
+        row.style.display = 'none';
+    }
+}
+
+function setupTestNotificationButton() {
+    const btn = document.getElementById('testNotificationBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        testReminderNotification();
+    });
+}
+
+function testReminderNotification() {
+    playReminderSound();
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('🔔 Vaccine Reminder (Test)', {
+            body: 'Test reminder – Max (Dog)\nRabies at 2:00 PM\n📍 123 Main St',
+            icon: './icon-192.png',
+            tag: 'test-reminder',
+            requireInteraction: true,
+            silent: false,
+            vibrate: [200, 100, 200]
+        });
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+    }
+    const badge = document.createElement('div');
+    badge.className = 'notification-badge';
+    badge.innerHTML = '<strong>🔔 Test reminder</strong><br>You should hear a sound and see a notification.';
+    document.body.appendChild(badge);
+    setTimeout(() => badge.remove(), 5000);
+}
+
+function playReminderSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+        console.log('Sound not supported', e);
+    }
 }
 
 function requestNotificationPermission() {
@@ -711,6 +774,7 @@ function requestNotificationPermission() {
                     registerPeriodicSync();
                     const banner = document.getElementById('notificationBanner');
                     if (banner) banner.style.display = 'none';
+                    showTestNotificationRowIfGranted();
                 }
             });
         } else if (Notification.permission === 'granted') {
@@ -869,6 +933,9 @@ function showReminder(appointment) {
         minute: '2-digit' 
     });
     
+    // Play sound so user hears the reminder
+    playReminderSound();
+
     // Browser notification (works even when app is closed if permission granted)
     if ('Notification' in window && Notification.permission === 'granted') {
         const notification = new Notification('🔔 Vaccine Reminder', {
@@ -877,6 +944,7 @@ function showReminder(appointment) {
             badge: './icon-192.png',
             tag: `reminder-${appointment.id}`,
             requireInteraction: true,
+            silent: false,
             vibrate: [200, 100, 200],
             data: {
                 appointmentId: appointment.id
