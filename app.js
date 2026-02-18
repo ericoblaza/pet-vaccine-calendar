@@ -31,16 +31,33 @@ const sortBtn = document.getElementById('sortBtn');
 
 // Initialize App
 function init() {
+    // Show app container after welcome screen (2.5 seconds)
+    setTimeout(() => {
+        const appContainer = document.getElementById('appContainer');
+        if (appContainer) {
+            appContainer.style.display = 'block';
+        }
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen) {
+            welcomeScreen.style.display = 'none';
+        }
+    }, 2500);
+    
     loadAppointments();
     setupEventListeners();
     renderCalendar();
     updateStats();
-    checkReminders();
     requestNotificationPermission();
     registerServiceWorker();
     
-    // Check for reminders every minute
+    // Schedule all reminders for background
+    scheduleAllReminders();
+    
+    // Check for reminders every minute (when app is open)
     setInterval(checkReminders, 60000);
+    
+    // Initial check
+    checkReminders();
 }
 
 // Service Worker Registration
@@ -397,6 +414,9 @@ function saveAppointment(e) {
     if (appointment.reminderTime && appointment.reminderTime !== 0) {
         scheduleReminder(appointment);
     }
+    
+    // Schedule all reminders for background processing
+    scheduleAllReminders();
 }
 
 function showAppointmentDetail(id) {
@@ -655,16 +675,105 @@ function updateStats() {
 
 // Reminder Functions
 function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
+    if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted');
+                    // Register periodic background sync if available
+                    registerPeriodicSync();
+                }
+            });
+        } else if (Notification.permission === 'granted') {
+            registerPeriodicSync();
+        }
     }
 }
 
-function scheduleReminder(appointment) {
-    // Reminders are checked periodically in checkReminders()
-    // This function could be extended to use service workers for background notifications
+// Register periodic background sync for reminders
+async function registerPeriodicSync() {
+    if ('serviceWorker' in navigator && 'periodicSync' in window.registration) {
+        try {
+            const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+            if (status.state === 'granted') {
+                await window.registration.periodicSync.register('check-reminders', {
+                    minInterval: 60 * 1000 // Check every minute
+                });
+                console.log('Periodic background sync registered');
+            }
+        } catch (error) {
+            console.log('Periodic sync not supported:', error);
+        }
+    }
 }
 
+// Schedule reminder with proper timing
+function scheduleReminder(appointment) {
+    if (!appointment.reminderTime || appointment.reminderTime === 0) return;
+    
+    const aptDate = new Date(appointment.date);
+    const reminderTime = aptDate.getTime() - (appointment.reminderTime * 60 * 1000);
+    const now = new Date().getTime();
+    
+    // Only schedule future reminders
+    if (reminderTime > now) {
+        // Store reminder in IndexedDB for service worker
+        storeReminderForBackground(appointment, reminderTime);
+        
+        // Also schedule immediate notification if app is open
+        const delay = reminderTime - now;
+        setTimeout(() => {
+            showReminder(appointment);
+        }, delay);
+    }
+    
+    // Send to service worker for background processing
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SCHEDULE_REMINDERS',
+            appointments: [appointment]
+        });
+    }
+}
+
+// Store reminder in IndexedDB for background access
+function storeReminderForBackground(appointment, reminderTime) {
+    if (!('indexedDB' in window)) {
+        // Fallback to localStorage
+        const reminderData = {
+            id: appointment.id,
+            appointment: appointment,
+            reminderTime: reminderTime
+        };
+        localStorage.setItem(`bg_reminder_${appointment.id}`, JSON.stringify(reminderData));
+        return;
+    }
+    
+    const request = indexedDB.open('VaccineCalendarDB', 1);
+    
+    request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('reminders')) {
+            db.createObjectStore('reminders', { keyPath: 'id' });
+        }
+    };
+    
+    request.onsuccess = (event) => {
+        const db = event.target.result;
+        const transaction = db.transaction(['reminders'], 'readwrite');
+        const store = transaction.objectStore('reminders');
+        
+        const reminderData = {
+            id: appointment.id,
+            appointment: appointment,
+            reminderTime: reminderTime
+        };
+        
+        store.put(reminderData);
+    };
+}
+
+// Check reminders (runs when app is open)
 function checkReminders() {
     const now = new Date();
     
@@ -684,6 +793,44 @@ function checkReminders() {
             }
         }
     });
+    
+    // Also check IndexedDB for scheduled reminders
+    checkScheduledReminders();
+}
+
+// Check reminders from IndexedDB
+function checkScheduledReminders() {
+    if (!('indexedDB' in window)) return;
+    
+    const request = indexedDB.open('VaccineCalendarDB', 1);
+    
+    request.onsuccess = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('reminders')) return;
+        
+        const transaction = db.transaction(['reminders'], 'readonly');
+        const store = transaction.objectStore('reminders');
+        const getAllRequest = store.getAll();
+        
+        getAllRequest.onsuccess = () => {
+            const reminders = getAllRequest.result;
+            const now = new Date().getTime();
+            
+            reminders.forEach(reminder => {
+                if (now >= reminder.reminderTime) {
+                    const reminderKey = `reminder_${reminder.appointment.id}`;
+                    if (!localStorage.getItem(reminderKey)) {
+                        showReminder(reminder.appointment);
+                        localStorage.setItem(reminderKey, 'shown');
+                        
+                        // Remove from IndexedDB
+                        const deleteTransaction = db.transaction(['reminders'], 'readwrite');
+                        deleteTransaction.objectStore('reminders').delete(reminder.id);
+                    }
+                }
+            });
+        };
+    };
 }
 
 function showReminder(appointment) {
@@ -693,28 +840,93 @@ function showReminder(appointment) {
         minute: '2-digit' 
     });
     
-    // Browser notification
+    // Browser notification (works even when app is closed if permission granted)
     if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Vaccine Reminder', {
-            body: `${appointment.petName} (${appointment.petType}) - ${appointment.vaccineType} at ${timeStr}\nLocation: ${appointment.location}`,
-            icon: 'icon-192.png',
-            tag: appointment.id
+        const notification = new Notification('🔔 Vaccine Reminder', {
+            body: `${appointment.petName} (${appointment.petType})\n${appointment.vaccineType} at ${timeStr}\n📍 ${appointment.location}`,
+            icon: './icon-192.png',
+            badge: './icon-192.png',
+            tag: `reminder-${appointment.id}`,
+            requireInteraction: true,
+            vibrate: [200, 100, 200],
+            data: {
+                appointmentId: appointment.id
+            }
         });
+        
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
     }
     
-    // In-app notification
-    const badge = document.createElement('div');
-    badge.className = 'notification-badge';
-    badge.innerHTML = `
-        <strong>🔔 Reminder</strong><br>
-        ${appointment.petName} - ${appointment.vaccineType}<br>
-        ${timeStr} at ${appointment.location}
-    `;
-    document.body.appendChild(badge);
+    // In-app notification (only if app is open)
+    if (document.body) {
+        const badge = document.createElement('div');
+        badge.className = 'notification-badge';
+        badge.innerHTML = `
+            <strong>🔔 Reminder</strong><br>
+            ${appointment.petName} - ${appointment.vaccineType}<br>
+            ${timeStr} at ${appointment.location}
+        `;
+        document.body.appendChild(badge);
+        
+        setTimeout(() => {
+            badge.remove();
+        }, 5000);
+    }
+}
+
+// Listen for service worker messages
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'GET_APPOINTMENTS_FOR_BACKGROUND') {
+            // Send appointments to service worker
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'APPOINTMENTS_DATA',
+                    appointments: appointments
+                });
+            }
+        }
+    });
     
-    setTimeout(() => {
-        badge.remove();
-    }, 5000);
+    // Listen for messages from service worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'SHOW_REMINDER') {
+            const appointment = appointments.find(a => a.id === event.data.appointmentId);
+            if (appointment) {
+                showReminder(appointment);
+            }
+        }
+    });
+}
+
+// Periodic check for reminders (runs in background when possible)
+setInterval(() => {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'CHECK_REMINDERS'
+        });
+    }
+    checkReminders();
+}, 60000); // Check every minute
+
+// Schedule all reminders for background
+function scheduleAllReminders() {
+    appointments.forEach(apt => {
+        if (apt.reminderTime && apt.reminderTime !== 0) {
+            scheduleReminder(apt);
+        }
+    });
+    
+    // Send to service worker
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SCHEDULE_REMINDERS',
+            appointments: appointments.filter(apt => apt.reminderTime && apt.reminderTime !== 0)
+        });
+    }
 }
 
 // Helper Functions
