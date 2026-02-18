@@ -173,6 +173,26 @@ body {
     transform: scale(0.95);
 }
 
+/* Reminder time display */
+.reminder-time-display {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    border-left: 3px solid var(--secondary-color);
+}
+
+.reminder-time-display small {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.reminder-time-display span {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
