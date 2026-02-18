@@ -21,6 +21,12 @@
     </div>
 
     <div class="app-container" id="appContainer" style="display: none;">
+        <!-- Enable Notifications Banner (for iPhone - Safari requires user tap) -->
+        <div id="notificationBanner" class="notification-banner" style="display: none;">
+            <span class="notification-banner-text">🔔 Tap to enable reminders</span>
+            <button type="button" id="enableNotificationsBtn" class="notification-banner-btn">Enable</button>
+        </div>
+
         <!-- Header -->
         <header class="app-header">
             <h1>🐾 Pet Vaccine Calendar</h1>
