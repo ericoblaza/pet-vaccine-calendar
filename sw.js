@@ -92,6 +92,7 @@ function showBackgroundNotification(appointment) {
     badge: './icon-192.png',
     tag: `reminder-${appointment.id}`,
     requireInteraction: true,
+    silent: false,
     vibrate: [200, 100, 200],
     data: {
       appointmentId: appointment.id,
