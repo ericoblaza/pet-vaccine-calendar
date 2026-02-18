@@ -47,7 +47,7 @@ function init() {
     setupEventListeners();
     renderCalendar();
     updateStats();
-    requestNotificationPermission();
+    setupNotificationBanner();
     registerServiceWorker();
     
     // Schedule all reminders for background
@@ -674,14 +674,43 @@ function updateStats() {
 }
 
 // Reminder Functions
+// IMPORTANT: On iPhone/Safari, the notification prompt ONLY appears when triggered by a user TAP.
+// So we show a banner with "Enable" button - when user taps it, the prompt appears.
+
+function setupNotificationBanner() {
+    const banner = document.getElementById('notificationBanner');
+    const btn = document.getElementById('enableNotificationsBtn');
+    if (!banner || !btn) return;
+
+    function updateBannerVisibility() {
+        if (!('Notification' in window)) {
+            banner.style.display = 'none';
+            return;
+        }
+        if (Notification.permission === 'default') {
+            banner.style.display = 'flex';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    updateBannerVisibility();
+
+    btn.addEventListener('click', function() {
+        requestNotificationPermission();
+        updateBannerVisibility();
+    });
+}
+
 function requestNotificationPermission() {
     if ('Notification' in window) {
         if (Notification.permission === 'default') {
             Notification.requestPermission().then(permission => {
                 if (permission === 'granted') {
                     console.log('Notification permission granted');
-                    // Register periodic background sync if available
                     registerPeriodicSync();
+                    const banner = document.getElementById('notificationBanner');
+                    if (banner) banner.style.display = 'none';
                 }
             });
         } else if (Notification.permission === 'granted') {
