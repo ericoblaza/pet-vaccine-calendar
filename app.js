@@ -56,8 +56,18 @@ function init() {
     // Check for reminders every minute (when app is open)
     setInterval(checkReminders, 60000);
     
+    // Also ask service worker to check (helps when tab is in background)
+    setInterval(() => {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CHECK_REMINDERS_NOW' });
+        }
+    }, 60000);
+    
     // Initial check
     checkReminders();
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_REMINDERS_NOW' });
+    }
 }
 
 // Service Worker Registration
@@ -839,20 +849,19 @@ function requestNotificationPermission() {
     }
 }
 
-// Register periodic background sync for reminders
+// Register periodic background sync so reminders fire when app is CLOSED (Chrome/PWA)
 async function registerPeriodicSync() {
-    if ('serviceWorker' in navigator && 'periodicSync' in window.registration) {
-        try {
-            const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
-            if (status.state === 'granted') {
-                await window.registration.periodicSync.register('check-reminders', {
-                    minInterval: 60 * 1000 // Check every minute
-                });
-                console.log('Periodic background sync registered');
-            }
-        } catch (error) {
-            console.log('Periodic sync not supported:', error);
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg.periodicSync) {
+            await reg.periodicSync.register('vaccine-reminders', {
+                minInterval: 60 * 60 * 1000 // 1 hour (Chrome may enforce minimum)
+            });
+            console.log('Background reminders registered (app can notify when closed)');
         }
+    } catch (e) {
+        console.log('Periodic sync not available:', e.message);
     }
 }
 
@@ -883,12 +892,9 @@ function scheduleReminder(appointment) {
         }, delay);
     }
     
-    // Send to service worker for background processing
+    // Tell service worker to check reminders now (helps when tab is in background)
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-            type: 'SCHEDULE_REMINDERS',
-            appointments: [appointment]
-        });
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_REMINDERS_NOW' });
     }
 }
 
