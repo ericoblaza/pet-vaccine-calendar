@@ -91,6 +91,14 @@ function setupEventListeners() {
     getLocationBtn.addEventListener('click', getCurrentLocation);
     sortBtn.addEventListener('click', toggleSort);
     
+    // Update reminder time display when date/time/reminder changes
+    const appointmentDate = document.getElementById('appointmentDate');
+    const appointmentTime = document.getElementById('appointmentTime');
+    const reminderTime = document.getElementById('reminderTime');
+    if (appointmentDate) appointmentDate.addEventListener('change', updateReminderTimeDisplay);
+    if (appointmentTime) appointmentTime.addEventListener('change', updateReminderTimeDisplay);
+    if (reminderTime) reminderTime.addEventListener('change', updateReminderTimeDisplay);
+    
     // Close modals when clicking outside
     appointmentModal.addEventListener('click', (e) => {
         if (e.target === appointmentModal) closeModalFunc();
@@ -411,7 +419,7 @@ function saveAppointment(e) {
     saveAppointments();
     closeModalFunc();
     
-    // Schedule reminder if set
+    // Schedule reminders if set (both pre-reminder and at-appointment-time)
     if (appointment.reminderTime && appointment.reminderTime !== 0) {
         scheduleReminder(appointment);
     }
@@ -747,6 +755,54 @@ function testReminderNotification() {
     setTimeout(() => badge.remove(), 5000);
 }
 
+// Update reminder time display in form
+function updateReminderTimeDisplay() {
+    const dateInput = document.getElementById('appointmentDate');
+    const timeInput = document.getElementById('appointmentTime');
+    const reminderSelect = document.getElementById('reminderTime');
+    const displayDiv = document.getElementById('reminderTimeDisplay');
+    const displayText = document.getElementById('reminderTimeText');
+    
+    if (!dateInput || !timeInput || !reminderSelect || !displayDiv || !displayText) return;
+    
+    const reminderValue = reminderSelect.value;
+    if (reminderValue === 'none' || reminderValue === '0') {
+        displayDiv.style.display = 'none';
+        return;
+    }
+    
+    const date = dateInput.value;
+    const time = timeInput.value;
+    
+    if (!date || !time) {
+        displayDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const appointmentDateTime = new Date(date + 'T' + time);
+        const reminderMinutes = parseInt(reminderValue);
+        const reminderDateTime = new Date(appointmentDateTime.getTime() - (reminderMinutes * 60 * 1000));
+        
+        const reminderTimeStr = reminderDateTime.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        const appointmentTimeStr = appointmentDateTime.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        displayText.textContent = `${reminderTimeStr} (appointment at ${appointmentTimeStr})`;
+        displayDiv.style.display = 'block';
+    } catch (e) {
+        displayDiv.style.display = 'none';
+    }
+}
+
 function playReminderSound() {
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -805,18 +861,25 @@ function scheduleReminder(appointment) {
     if (!appointment.reminderTime || appointment.reminderTime === 0) return;
     
     const aptDate = new Date(appointment.date);
-    const reminderTime = aptDate.getTime() - (appointment.reminderTime * 60 * 1000);
     const now = new Date().getTime();
     
-    // Only schedule future reminders
-    if (reminderTime > now) {
-        // Store reminder in IndexedDB for service worker
-        storeReminderForBackground(appointment, reminderTime);
-        
-        // Also schedule immediate notification if app is open
-        const delay = reminderTime - now;
+    // Schedule reminder BEFORE appointment (e.g., 15 min before)
+    const preReminderTime = aptDate.getTime() - (appointment.reminderTime * 60 * 1000);
+    if (preReminderTime > now) {
+        storeReminderForBackground(appointment, preReminderTime, 'pre');
+        const delay = preReminderTime - now;
         setTimeout(() => {
-            showReminder(appointment);
+            showReminder(appointment, 'pre');
+        }, delay);
+    }
+    
+    // ALSO schedule reminder AT appointment time (e.g., exactly at 2pm)
+    const appointmentTime = aptDate.getTime();
+    if (appointmentTime > now) {
+        storeReminderForBackground(appointment, appointmentTime, 'at');
+        const delay = appointmentTime - now;
+        setTimeout(() => {
+            showReminder(appointment, 'at');
         }, delay);
     }
     
@@ -830,15 +893,17 @@ function scheduleReminder(appointment) {
 }
 
 // Store reminder in IndexedDB for background access
-function storeReminderForBackground(appointment, reminderTime) {
+function storeReminderForBackground(appointment, reminderTime, type = 'pre') {
+    const reminderId = `${appointment.id}_${type}`;
     if (!('indexedDB' in window)) {
         // Fallback to localStorage
         const reminderData = {
-            id: appointment.id,
+            id: reminderId,
             appointment: appointment,
-            reminderTime: reminderTime
+            reminderTime: reminderTime,
+            type: type
         };
-        localStorage.setItem(`bg_reminder_${appointment.id}`, JSON.stringify(reminderData));
+        localStorage.setItem(`bg_reminder_${reminderId}`, JSON.stringify(reminderData));
         return;
     }
     
@@ -857,9 +922,10 @@ function storeReminderForBackground(appointment, reminderTime) {
         const store = transaction.objectStore('reminders');
         
         const reminderData = {
-            id: appointment.id,
+            id: reminderId,
             appointment: appointment,
-            reminderTime: reminderTime
+            reminderTime: reminderTime,
+            type: type
         };
         
         store.put(reminderData);
@@ -868,20 +934,29 @@ function storeReminderForBackground(appointment, reminderTime) {
 
 // Check reminders (runs when app is open)
 function checkReminders() {
-    const now = new Date();
+    const now = new Date().getTime();
     
     appointments.forEach(apt => {
         if (!apt.reminderTime || apt.reminderTime === 0) return;
         
         const aptDate = new Date(apt.date);
-        const reminderTime = aptDate.getTime() - (apt.reminderTime * 60 * 1000);
+        const aptTime = aptDate.getTime();
         
-        // Check if reminder time has passed but appointment hasn't
-        if (now.getTime() >= reminderTime && aptDate.getTime() > now.getTime()) {
-            // Check if we've already shown this reminder
-            const reminderKey = `reminder_${apt.id}`;
+        // Check PRE-reminder (e.g., 15 min before)
+        const preReminderTime = aptTime - (apt.reminderTime * 60 * 1000);
+        if (now >= preReminderTime && aptTime > now) {
+            const reminderKey = `reminder_${apt.id}_pre`;
             if (!localStorage.getItem(reminderKey)) {
-                showReminder(apt);
+                showReminder(apt, 'pre');
+                localStorage.setItem(reminderKey, 'shown');
+            }
+        }
+        
+        // Check AT appointment time reminder (e.g., exactly at 2pm)
+        if (now >= aptTime && aptTime > (now - 60000)) { // Within 1 minute of appointment time
+            const reminderKey = `reminder_${apt.id}_at`;
+            if (!localStorage.getItem(reminderKey)) {
+                showReminder(apt, 'at');
                 localStorage.setItem(reminderKey, 'shown');
             }
         }
@@ -911,9 +986,9 @@ function checkScheduledReminders() {
             
             reminders.forEach(reminder => {
                 if (now >= reminder.reminderTime) {
-                    const reminderKey = `reminder_${reminder.appointment.id}`;
+                    const reminderKey = `reminder_${reminder.appointment.id}_${reminder.type || 'pre'}`;
                     if (!localStorage.getItem(reminderKey)) {
-                        showReminder(reminder.appointment);
+                        showReminder(reminder.appointment, reminder.type || 'pre');
                         localStorage.setItem(reminderKey, 'shown');
                         
                         // Remove from IndexedDB
@@ -926,7 +1001,7 @@ function checkScheduledReminders() {
     };
 }
 
-function showReminder(appointment) {
+function showReminder(appointment, type = 'pre') {
     const date = new Date(appointment.date);
     const timeStr = date.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
@@ -936,13 +1011,20 @@ function showReminder(appointment) {
     // Play sound so user hears the reminder
     playReminderSound();
 
+    // Different messages for pre-reminder vs at-appointment-time
+    const isAtTime = type === 'at';
+    const title = isAtTime ? '🔔 Appointment Time!' : '🔔 Vaccine Reminder';
+    const bodyText = isAtTime 
+        ? `${appointment.petName} (${appointment.petType})\n${appointment.vaccineType} appointment is NOW at ${timeStr}\n📍 ${appointment.location}`
+        : `${appointment.petName} (${appointment.petType})\n${appointment.vaccineType} at ${timeStr}\n📍 ${appointment.location}`;
+
     // Browser notification (works even when app is closed if permission granted)
     if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('🔔 Vaccine Reminder', {
-            body: `${appointment.petName} (${appointment.petType})\n${appointment.vaccineType} at ${timeStr}\n📍 ${appointment.location}`,
+        const notification = new Notification(title, {
+            body: bodyText,
             icon: './icon-192.png',
             badge: './icon-192.png',
-            tag: `reminder-${appointment.id}`,
+            tag: `reminder-${appointment.id}-${type}`,
             requireInteraction: true,
             silent: false,
             vibrate: [200, 100, 200],
@@ -962,7 +1044,7 @@ function showReminder(appointment) {
         const badge = document.createElement('div');
         badge.className = 'notification-badge';
         badge.innerHTML = `
-            <strong>🔔 Reminder</strong><br>
+            <strong>${isAtTime ? '🔔 Appointment Time!' : '🔔 Reminder'}</strong><br>
             ${appointment.petName} - ${appointment.vaccineType}<br>
             ${timeStr} at ${appointment.location}
         `;
